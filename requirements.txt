@@ -1,9 +1,8 @@
-pandas
+pandas 
 numpy
-scipy
 matplotlib
-seaborn
-wordcloud
-pyarrow
+seaborn 
+wordcloud 
+pyarrow 
 python-multipart
 -e .

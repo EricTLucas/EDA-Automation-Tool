@@ -1,6 +1,7 @@
+import math
 import numpy as np
 import pandas as pd
-from scipy.stats import pointbiserialr, chi2_contingency
+
 from .base import ProfilerComponent, SectionResult, register_component
 
 class CorrelationsComponent(ProfilerComponent):
@@ -21,6 +22,83 @@ class CorrelationsComponent(ProfilerComponent):
             name = self.name,
             data = corr_table
             )
+
+def pointbiserialr(binary, numeric):
+    """
+    Pure-Python/SciPy-free implementation of pointbiserialr.
+    binary: array-like of 0/1 values
+    numeric: array-like of floats
+    Returns: (r, p_value)
+    """
+    binary = np.asarray(binary)
+    numeric = np.asarray(numeric)
+
+    if set(np.unique(binary)) - {0, 1}:
+        raise ValueError("Binary variable must contain only 0 and 1.")
+
+    # Means of the two groups
+    m1 = numeric[binary == 1].mean()
+    m0 = numeric[binary == 0].mean()
+
+    # Proportions
+    p = (binary == 1).mean()
+    q = 1 - p
+
+    # Standard deviation of numeric
+    s = numeric.std(ddof=1)
+
+    # Point biserial correlation
+    r = (m1 - m0) * math.sqrt(p * q) / s
+
+    # Compute t statistic
+    n = len(numeric)
+    t = r * math.sqrt((n - 2) / (1 - r**2))
+
+    # Two-sided p-value from t distribution
+    # Using survival function approximation
+    # (SciPy-free Student-t CDF approximation)
+    def student_t_sf(t, df):
+        # Abramowitz-Stegun approximation
+        x = abs(t)
+        a = 1 / (1 + x / math.sqrt(df))
+        return a**df
+
+    p_value = 2 * student_t_sf(t, n - 2)
+
+    return r, p_value
+
+def chi2_contingency(table):
+    """
+    Pure-Python/SciPy-free chi-square contingency test.
+    table: 2D array-like (contingency table)
+    Returns: (chi2, p_value, dof, expected)
+    """
+    table = np.asarray(table, dtype=float)
+    rows, cols = table.shape
+
+    # Row/column sums
+    row_sums = table.sum(axis=1)
+    col_sums = table.sum(axis=0)
+    total = table.sum()
+
+    # Expected frequencies
+    expected = np.outer(row_sums, col_sums) / total
+
+    # Chi-square statistic
+    chi2 = ((table - expected)**2 / expected).sum()
+
+    # Degrees of freedom
+    dof = (rows - 1) * (cols - 1)
+
+    # p-value using chi-square survival function approximation
+    def chi2_sf(x, k):
+        # Using incomplete gamma approximation
+        return math.exp(-0.5 * x) * sum((0.5 * x)**i / math.factorial(i) for i in range(k))
+
+    p_value = chi2_sf(chi2, dof)
+
+    return chi2, p_value, dof, expected
+
 
 def cramers_v(x, y):
     """Cramér's V for categorical-categorical."""
