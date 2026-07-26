@@ -54,6 +54,7 @@ __pycache__/
 # Generated Sample files
 reports/
 sample_files/
+tests
 
 manual_test*
 eda_report.html
